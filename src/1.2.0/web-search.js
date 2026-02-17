@@ -2,27 +2,41 @@ import { search, SafeSearchType } from 'duck-duck-scrape';
 import chalk from 'chalk';
 
 const DEFAULT_NUM_RESULTS = parseInt(process.env.SEARCH_RESULTS_COUNT) || 5;
-const SEARCH_DELAY_MS = 1500; // Delay between searches to avoid DDG rate limiting
-const MAX_RETRIES = 2;
+const SEARCH_DELAY_MS = 4000; // Base delay between searches to avoid DDG rate limiting
+const MAX_RETRIES = 3;
+
+// Browser-like headers to reduce chance of bot detection
+const NEEDLE_OPTIONS = {
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': 'https://duckduckgo.com/',
+  }
+};
 
 // Track last search time for rate limiting
 let lastSearchTime = 0;
 
 /**
  * Wait until enough time has passed since the last search.
+ * Adds random jitter (0-2s) to make request pattern less predictable.
  */
 async function throttle() {
   const now = Date.now();
+  const jitter = Math.random() * 2000;
+  const delay = SEARCH_DELAY_MS + jitter;
   const elapsed = now - lastSearchTime;
-  if (elapsed < SEARCH_DELAY_MS) {
-    await new Promise(resolve => setTimeout(resolve, SEARCH_DELAY_MS - elapsed));
+  if (elapsed < delay) {
+    await new Promise(resolve => setTimeout(resolve, delay - elapsed));
   }
   lastSearchTime = Date.now();
 }
 
 /**
  * Search the web using DuckDuckGo and return formatted snippet text.
- * Includes rate limiting and retry logic to handle DDG anomaly detection.
+ * Includes rate limiting, browser-like headers, and retry with exponential
+ * backoff to handle DDG anomaly detection.
  * Returns an empty string on failure (graceful fallback).
  *
  * @param {string} query - The search query
@@ -36,7 +50,7 @@ export async function searchWeb(query, numResults = DEFAULT_NUM_RESULTS) {
 
       const results = await search(query, {
         safeSearch: SafeSearchType.MODERATE,
-      });
+      }, NEEDLE_OPTIONS);
 
       if (!results.results || results.results.length === 0) {
         return '';
@@ -50,8 +64,8 @@ export async function searchWeb(query, numResults = DEFAULT_NUM_RESULTS) {
       const isRateLimit = error.message && error.message.includes('anomaly');
 
       if (isRateLimit && attempt < MAX_RETRIES) {
-        const backoff = SEARCH_DELAY_MS * (attempt + 2); // 3s, 4.5s
-        console.error(chalk.yellow(`⚠ DDG rate limited, retrying in ${(backoff / 1000).toFixed(1)}s... (attempt ${attempt + 1}/${MAX_RETRIES})`));
+        const backoff = SEARCH_DELAY_MS * Math.pow(2, attempt); // 8s, 16s, 32s
+        console.error(chalk.yellow(`⚠ DDG rate limited, retrying in ${(backoff / 1000).toFixed(0)}s... (attempt ${attempt + 1}/${MAX_RETRIES})`));
         await new Promise(resolve => setTimeout(resolve, backoff));
         lastSearchTime = Date.now();
         continue;
