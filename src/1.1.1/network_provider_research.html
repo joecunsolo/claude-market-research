@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Provider Research Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #1a202c;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #718096;
+            font-size: 14px;
+        }
+        
+        .upload-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .file-label {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+        
+        .file-label:hover {
+            background: #5568d3;
+        }
+        
+        .file-name {
+            margin-left: 15px;
+            color: #4a5568;
+            font-size: 14px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            background: #48bb78;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            margin-left: 10px;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: #38a169;
+        }
+        
+        .btn:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+        }
+        
+        .progress-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .progress-text {
+            color: #4a5568;
+            font-size: 14px;
+        }
+        
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .company-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .company-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .company-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .company-name {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a202c;
+        }
+        
+        .company-ticker {
+            background: #edf2f7;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #4a5568;
+        }
+        
+        .data-grid {
+            display: grid;
+            gap: 12px;
+        }
+        
+        .data-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            padding: 8px 0;
+        }
+        
+        .data-label {
+            font-size: 13px;
+            color: #718096;
+            font-weight: 500;
+            flex: 0 0 45%;
+        }
+        
+        .data-value {
+            font-size: 13px;
+            color: #1a202c;
+            font-weight: 500;
+            text-align: right;
+            flex: 1;
+        }
+        
+        .loading {
+            color: #a0aec0;
+            font-style: italic;
+        }
+        
+        .error {
+            color: #f56565;
+        }
+        
+        .positive {
+            color: #48bb78;
+        }
+        
+        .negative {
+            color: #f56565;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .status-researching {
+            background: #fef5e7;
+            color: #d69e2e;
+        }
+        
+        .status-complete {
+            background: #e6fffa;
+            color: #38b2ac;
+        }
+        
+        .export-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Network Provider Research Dashboard</h1>
+            <p class="subtitle">Upload your CSV file to automatically research and analyze network service providers</p>
+        </div>
+        
+        <div class="upload-section">
+            <div class="file-input-wrapper">
+                <input type="file" id="csvFile" accept=".csv">
+                <label for="csvFile" class="file-label">Choose CSV File</label>
+                <span class="file-name" id="fileName">No file chosen</span>
+            </div>
+            <button class="btn" id="startResearch" disabled>Start Research</button>
+        </div>
+        
+        <div class="progress-section" id="progressSection">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p class="progress-text" id="progressText">Researching companies...</p>
+        </div>
+        
+        <div class="results-grid" id="resultsGrid"></div>
+        
+        <div class="export-section" id="exportSection">
+            <button class="btn" id="exportBtn">📥 Export Results as CSV</button>
+        </div>
+    </div>
+
+    <script>
+        let companies = [];
+        let researchData = [];
+        
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('fileName').textContent = file.name;
+                document.getElementById('startResearch').disabled = false;
+                
+                Papa.parse(file, {
+                    header: true,
+                    complete: function(results) {
+                        companies = results.data.filter(row => row['Company Name']);
+                        console.log('Loaded companies:', companies);
+                    }
+                });
+            }
+        });
+        
+        document.getElementById('startResearch').addEventListener('click', async function() {
+            document.getElementById('progressSection').style.display = 'block';
+            document.getElementById('startResearch').disabled = true;
+            researchData = [];
+            
+            for (let i = 0; i < companies.length; i++) {
+                const company = companies[i];
+                updateProgress((i / companies.length) * 100, `Researching ${company['Company Name']} (${i + 1}/${companies.length})...`);
+                
+                await researchCompany(company);
+            }
+            
+            updateProgress(100, 'Research complete!');
+            document.getElementById('exportSection').style.display = 'block';
+        });
+        
+        function updateProgress(percent, text) {
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressText').textContent = text;
+        }
+        
+        async function researchCompany(company) {
+            const cardId = 'card-' + company['Company Name'].replace(/\s/g, '-');
+            
+            // Create card
+            const card = document.createElement('div');
+            card.className = 'company-card';
+            card.id = cardId;
+            card.innerHTML = `
+                <div class="company-header">
+                    <div class="company-name">${company['Company Name']}</div>
+                    ${company['Stock Ticker'] ? `<div class="company-ticker">${company['Stock Ticker']}</div>` : ''}
+                </div>
+                <div class="data-grid" id="${cardId}-data">
+                    <div class="data-item">
+                        <span class="data-label">Status</span>
+                        <span class="data-value"><span class="status-badge status-researching">Researching...</span></span>
+                    </div>
+                </div>
+            `;
+            document.getElementById('resultsGrid').appendChild(card);
+            
+            // Research data points
+            const data = {
+                companyName: company['Company Name'],
+                website: company['Website'] || '',
+                ticker: company['Stock Ticker'] || '',
+                tamPercent: await searchData(company, 'TAM market share'),
+                carrierRevenue: await searchData(company, 'annual revenue'),
+                marketCap: await searchData(company, 'market capitalization'),
+                tmForumSpeakers: await searchData(company, 'TM Forum speakers'),
+                tmForumSponsorship: await searchData(company, 'TM Forum sponsorship'),
+                catalystProjects: await searchData(company, 'TM Forum Catalyst projects'),
+                whitePapers: await searchData(company, 'white papers telecommunications'),
+                membershipTier: await searchData(company, 'TM Forum membership'),
+                newsScore: await getNewsScore(company),
+                ossSpend: await searchData(company, 'OSS spending operational support systems'),
+                customerBase: await searchData(company, 'customer base subscribers'),
+                stockChange: await searchData(company, 'stock price change year over year'),
+                carrierType: await searchData(company, 'carrier type mobile fixed'),
+                regionalMarket: await searchData(company, 'regional market presence')
+            };
+            
+            researchData.push(data);
+            displayCompanyData(cardId, data);
+        }
+        
+        async function searchData(company, query) {
+            try {
+                const searchQuery = `${company['Company Name']} ${query}`;
+                const response = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 1000,
+                        messages: [{
+                            role: 'user',
+                            content: `Search for information about ${searchQuery}. Provide a concise answer (1-2 sentences max) with the most recent data available.`
+                        }],
+                        tools: [{
+                            type: "web_search_20250305",
+                            name: "web_search"
+                        }]
+                    })
+                });
+                
+                const result = await response.json();
+                const textContent = result.content
+                    .filter(item => item.type === 'text')
+                    .map(item => item.text)
+                    .join(' ');
+                
+                return textContent || 'No data found';
+            } catch (error) {
+                console.error('Search error:', error);
+                return 'Error retrieving data';
+            }
+        }
+        
+        async function getNewsScore(company) {
+            try {
+                const response = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 1000,
+                        messages: [{
+                            role: 'user',
+                            content: `Search for recent news about ${company['Company Name']}. Analyze the sentiment and provide a score from -10 (very negative) to +10 (very positive). Return only the number.`
+                        }],
+                        tools: [{
+                            type: "web_search_20250305",
+                            name: "web_search"
+                        }]
+                    })
+                });
+                
+                const result = await response.json();
+                const textContent = result.content
+                    .filter(item => item.type === 'text')
+                    .map(item => item.text)
+                    .join(' ');
+                
+                const score = parseInt(textContent.match(/-?\d+/)?.[0] || '0');
+                return score;
+            } catch (error) {
+                return 0;
+            }
+        }
+        
+        function displayCompanyData(cardId, data) {
+            const dataContainer = document.getElementById(cardId + '-data');
+            
+            dataContainer.innerHTML = `
+                <div class="data-item">
+                    <span class="data-label">Status</span>
+                    <span class="data-value"><span class="status-badge status-complete">Complete</span></span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">TAM %</span>
+                    <span class="data-value">${data.tamPercent}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Carrier Revenue</span>
+                    <span class="data-value">${data.carrierRevenue}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Market Cap</span>
+                    <span class="data-value">${data.marketCap}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">TM Forum Speakers</span>
+                    <span class="data-value">${data.tmForumSpeakers}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">TM Forum Sponsorship</span>
+                    <span class="data-value">${data.tmForumSponsorship}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Catalyst Projects</span>
+                    <span class="data-value">${data.catalystProjects}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">White Papers</span>
+                    <span class="data-value">${data.whitePapers}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Membership Tier</span>
+                    <span class="data-value">${data.membershipTier}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">News Score</span>
+                    <span class="data-value ${data.newsScore > 0 ? 'positive' : data.newsScore < 0 ? 'negative' : ''}">${data.newsScore > 0 ? '+' : ''}${data.newsScore}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">OSS Spend Ranking</span>
+                    <span class="data-value">${data.ossSpend}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Customer Base</span>
+                    <span class="data-value">${data.customerBase}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Stock Change YoY</span>
+                    <span class="data-value">${data.stockChange}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Carrier Type</span>
+                    <span class="data-value">${data.carrierType}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Regional Market</span>
+                    <span class="data-value">${data.regionalMarket}</span>
+                </div>
+            `;
+        }
+        
+        document.getElementById('exportBtn').addEventListener('click', function() {
+            const csvContent = generateCSV(researchData);
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'network_provider_research_results.csv';
+            a.click();
+        });
+        
+        function generateCSV(data) {
+            const headers = [
+                'Company Name', 'Website', 'Stock Ticker', 'TAM %', 'Carrier Revenue',
+                'Market Cap', 'TM Forum Speakers', 'TM Forum Sponsorship', 'Catalyst Projects',
+                'White Papers', 'Membership Tier', 'News Score', 'OSS Spend Ranking',
+                'Customer Base', 'Stock Change YoY', 'Carrier Type', 'Regional Market'
+            ];
+            
+            const rows = data.map(d => [
+                d.companyName, d.website, d.ticker, d.tamPercent, d.carrierRevenue,
+                d.marketCap, d.tmForumSpeakers, d.tmForumSponsorship, d.catalystProjects,
+                d.whitePapers, d.membershipTier, d.newsScore, d.ossSpend,
+                d.customerBase, d.stockChange, d.carrierType, d.regionalMarket
+            ].map(val => `"${val}"`).join(','));
+            
+            return [headers.join(','), ...rows].join('\n');
+        }
+    </script>
+</body>
+</html>

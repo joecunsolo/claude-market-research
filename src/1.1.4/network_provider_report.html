@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Provider Analysis Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #1a1a2e;
+            --secondary: #16213e;
+            --accent: #0f3460;
+            --highlight: #e94560;
+            --text: #f1f1f1;
+            --text-muted: #a8a8a8;
+            --card-bg: #1f2937;
+            --border: #374151;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .container { max-width: 1600px; margin: 0 auto; padding: 20px; }
+        
+        header {
+            text-align: center;
+            padding: 40px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #fff 0%, var(--highlight) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle { color: var(--text-muted); font-size: 1rem; }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            overflow-x: auto;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+        }
+        
+        .tab {
+            padding: 12px 24px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+        
+        .tab:hover { background: var(--accent); border-color: var(--highlight); }
+        .tab.active { background: var(--highlight); border-color: var(--highlight); color: white; }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(233, 69, 96, 0.2);
+        }
+        
+        .card h2 { font-size: 1.25rem; margin-bottom: 20px; color: var(--highlight); }
+        .chart-container { position: relative; height: 300px; }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        thead { background: var(--accent); }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        th {
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+        th:hover { background: var(--secondary); }
+        th.sortable::after { content: '⇅'; position: absolute; right: 8px; opacity: 0.3; }
+        th.sorted-asc::after { content: '↑'; opacity: 1; }
+        th.sorted-desc::after { content: '↓'; opacity: 1; }
+        tbody tr { transition: background 0.2s; }
+        tbody tr:hover { background: rgba(255, 255, 255, 0.05); cursor: pointer; }
+        
+        .metric-value { font-weight: 600; color: var(--highlight); }
+        .positive { color: #10b981; }
+        .negative { color: #ef4444; }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active { display: flex; }
+        
+        .modal-content {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: var(--highlight);
+            border: none;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            line-height: 1;
+        }
+        
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .detail-item { padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; }
+        .detail-label { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; }
+        .detail-value { font-size: 1.1rem; font-weight: 600; color: var(--text); }
+        
+        .raw-data {
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--primary);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .raw-data h3 { color: var(--highlight); margin-bottom: 10px; }
+        .raw-data-item {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .raw-data-label { color: var(--text-muted); font-weight: 600; }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card { background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px; text-align: center; }
+        .stat-value { font-size: 2rem; font-weight: 700; color: var(--highlight); }
+        .stat-label { font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Network Provider Analysis Report</h1>
+            <p class="subtitle">Comprehensive comparison of 5 network service providers</p>
+        </header>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('overview')">📈 Overview</div>
+            <div class="tab" onclick="switchTab('financial')">💰 Financial</div>
+            <div class="tab" onclick="switchTab('customers')">👥 Customers</div>
+            <div class="tab" onclick="switchTab('tm-forum')">🎯 TM Forum</div>
+            <div class="tab" onclick="switchTab('news')">📰 News</div>
+            <div class="tab" onclick="switchTab('data-table')">📋 Data Table</div>
+        </div>
+        
+        <div id="overview" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">5</div>
+                    <div class="stat-label">Total Carriers</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">4</div>
+                    <div class="stat-label">Countries</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">0</div>
+                    <div class="stat-label">Top-Tier Partners</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">0</div>
+                    <div class="stat-label">Positive Sentiment</div>
+                </div>
+            </div>
+            
+            <div class="grid">
+                <div class="card">
+                    <h2>Coverage vs Sentiment Matrix</h2>
+                    <p style="font-size:0.78rem; color: var(--text-muted); margin-bottom: 12px;">X = Article Count &nbsp;|&nbsp; Y = Sentiment Score (-10 to +10)</p>
+                    <div class="chart-container"><canvas id="overviewNewsMatrixChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <h2>Market Cap vs Revenue</h2>
+                    <div class="chart-container"><canvas id="marketCapChart"></canvas></div>
+                </div>
+            </div>
+            
+            <div class="grid">
+                <div class="card">
+                    <h2>Geographic Distribution</h2>
+                    <div class="chart-container"><canvas id="geoChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <h2>TM Forum Engagement</h2>
+                    <p style="font-size:0.78rem; color: var(--text-muted); margin-bottom: 12px;">Bubble size = Sponsorship level &nbsp;|&nbsp; Color = White Papers volume</p>
+                    <div class="chart-container"><canvas id="engagementChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="financial" class="tab-content">
+            <div class="grid">
+                <div class="card">
+                    <h2>Revenue Comparison</h2>
+                    <div class="chart-container"><canvas id="revenueBarChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <h2>Market Capitalization</h2>
+                    <div class="chart-container"><canvas id="marketCapBarChart"></canvas></div>
+                </div>
+            </div>
+            
+            <div class="grid">
+                <div class="card">
+                    <h2>Stock Performance YoY</h2>
+                    <div class="chart-container"><canvas id="stockChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <h2>TAM Market Share</h2>
+                    <div class="chart-container"><canvas id="tamChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="customers" class="tab-content">
+            <div class="grid">
+                <div class="card">
+                    <h2>Customer Segmentation</h2>
+                    <div class="chart-container"><canvas id="customerSegmentChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <h2>Mobile Subscribers</h2>
+                    <div class="chart-container"><canvas id="mobileChart"></canvas></div>
+                </div>
+            </div>
+            
+            <div class="grid">
+                <div class="card">
+                    <h2>Broadband Subscribers</h2>
+                    <div class="chart-container"><canvas id="broadbandChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <h2>Enterprise Customers</h2>
+                    <div class="chart-container"><canvas id="enterpriseChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="tm-forum" class="tab-content">
+            <div class="grid">
+                <div class="card">
+                    <h2>Sponsorship Scores</h2>
+                    <div class="chart-container"><canvas id="sponsorshipChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <h2>Speaker Participation</h2>
+                    <div class="chart-container"><canvas id="speakersChart"></canvas></div>
+                </div>
+            </div>
+            
+            <div class="grid">
+                <div class="card">
+                    <h2>Catalyst Projects</h2>
+                    <div class="chart-container"><canvas id="catalystChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <h2>White Papers Published</h2>
+                    <div class="chart-container"><canvas id="whitePapersChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="news" class="tab-content">
+            <div class="grid">
+                <div class="card">
+                    <h2>News Coverage Volume</h2>
+                    <div class="chart-container"><canvas id="newsCountChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <h2>Sentiment Analysis</h2>
+                    <div class="chart-container"><canvas id="sentimentChart"></canvas></div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>Coverage vs Sentiment Matrix</h2>
+                <div class="chart-container"><canvas id="newsMatrixChart"></canvas></div>
+            </div>
+        </div>
+        
+        <div id="data-table" class="tab-content">
+            <div class="card">
+                <h2>Complete Dataset (Click row for details)</h2>
+                <div style="overflow-x: auto;">
+                    <table id="dataTable">
+                        <thead>
+                            <tr>
+                                <th class="sortable" onclick="sortTable(0)">Company</th>
+                                <th class="sortable" onclick="sortTable(1)">Country</th>
+                                <th class="sortable" onclick="sortTable(2)">Revenue ($B)</th>
+                                <th class="sortable" onclick="sortTable(3)">Market Cap ($B)</th>
+                                <th class="sortable" onclick="sortTable(4)">Sponsorship</th>
+                                <th class="sortable" onclick="sortTable(5)">Speakers</th>
+                                <th class="sortable" onclick="sortTable(6)">Sentiment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            
+                                <tr onclick="showDetails(0)">
+                                    <td><strong>Verizon</strong></td>
+                                    <td>United States</td>
+                                    <td class="metric-value">134.8</td>
+                                    <td class="metric-value">197</td>
+                                    <td class="metric-value">10</td>
+                                    <td class="metric-value">25</td>
+                                    <td class="metric-value ">0</td>
+                                </tr>
+                            
+                                <tr onclick="showDetails(1)">
+                                    <td><strong>AT&T</strong></td>
+                                    <td>United States</td>
+                                    <td class="metric-value">N/A</td>
+                                    <td class="metric-value">193.61</td>
+                                    <td class="metric-value">10</td>
+                                    <td class="metric-value">3</td>
+                                    <td class="metric-value ">0</td>
+                                </tr>
+                            
+                                <tr onclick="showDetails(2)">
+                                    <td><strong>Deutsche Telekom</strong></td>
+                                    <td>Germany</td>
+                                    <td class="metric-value">N/A</td>
+                                    <td class="metric-value">N/A</td>
+                                    <td class="metric-value">10</td>
+                                    <td class="metric-value">5</td>
+                                    <td class="metric-value ">0</td>
+                                </tr>
+                            
+                                <tr onclick="showDetails(3)">
+                                    <td><strong>Vodafone</strong></td>
+                                    <td>United Kingdom</td>
+                                    <td class="metric-value">N/A</td>
+                                    <td class="metric-value">N/A</td>
+                                    <td class="metric-value">0</td>
+                                    <td class="metric-value">0</td>
+                                    <td class="metric-value ">0</td>
+                                </tr>
+                            
+                                <tr onclick="showDetails(4)">
+                                    <td><strong>Orange</strong></td>
+                                    <td>France</td>
+                                    <td class="metric-value">N/A</td>
+                                    <td class="metric-value">N/A</td>
+                                    <td class="metric-value">0</td>
+                                    <td class="metric-value">0</td>
+                                    <td class="metric-value ">0</td>
+                                </tr>
+                            
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">×</button>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        const summaryData = [{"Company Name":"Verizon","Website":"https://www.verizon.com","Stock Ticker":"VZ","Carrier Revenue ($B)":"134.8","Market Cap ($B)":"197","TAM (%)":"34","Customers - Mobile (M)":"144.8","Customers - Broadband (M)":"12.3","Customers - Enterprise (M)":"N/A","Stock Change YoY (%)":"+20.50","TM Forum Speakers":"25","TM Forum Sponsorship Score":"10","Catalyst Projects":"6","White Papers":"0","News Article Count":"0","News Sentiment Score":"0","Primary Country":"United States"},{"Company Name":"AT&T","Website":"https://www.att.com","Stock Ticker":"T","Carrier Revenue ($B)":"N/A","Market Cap ($B)":"193.61","TAM (%)":"29","Customers - Mobile (M)":"N/A","Customers - Broadband (M)":"13.89","Customers - Enterprise (M)":"N/A","Stock Change YoY (%)":"N/A","TM Forum Speakers":"3","TM Forum Sponsorship Score":"10","Catalyst Projects":"3","White Papers":"0","News Article Count":"0","News Sentiment Score":"0","Primary Country":"United States"},{"Company Name":"Deutsche Telekom","Website":"https://www.telekom.com","Stock Ticker":"DTE.DE","Carrier Revenue ($B)":"N/A","Market Cap ($B)":"N/A","TAM (%)":"N/A","Customers - Mobile (M)":"108.9","Customers - Broadband (M)":"N/A","Customers - Enterprise (M)":"N/A","Stock Change YoY (%)":"-11.25","TM Forum Speakers":"5","TM Forum Sponsorship Score":"10","Catalyst Projects":"4","White Papers":"0","News Article Count":"0","News Sentiment Score":"0","Primary Country":"Germany"},{"Company Name":"Vodafone","Website":"https://www.vodafone.com","Stock Ticker":"VOD","Carrier Revenue ($B)":"N/A","Market Cap ($B)":"N/A","TAM (%)":"N/A","Customers - Mobile (M)":"223","Customers - Broadband (M)":"N/A","Customers - Enterprise (M)":"N/A","Stock Change YoY (%)":"+41.4","TM Forum Speakers":"0","TM Forum Sponsorship Score":"0","Catalyst Projects":"0","White Papers":"0","News Article Count":"0","News Sentiment Score":"0","Primary Country":"United Kingdom"},{"Company Name":"Orange","Website":"https://www.orange.com","Stock Ticker":"ORA.PA","Carrier Revenue ($B)":"N/A","Market Cap ($B)":"N/A","TAM (%)":"N/A","Customers - Mobile (M)":"253","Customers - Broadband (M)":"22","Customers - Enterprise (M)":"N/A","Stock Change YoY (%)":"+44.98","TM Forum Speakers":"0","TM Forum Sponsorship Score":"0","Catalyst Projects":"0","White Papers":"0","News Article Count":"0","News Sentiment Score":"0","Primary Country":"France"}];
+        const rawData = [{"Company Name":"Verizon","Website":"https://www.verizon.com","Stock Ticker":"VZ","TAM %":"The search results provide extensive information about Total Addressable Market (TAM) concepts and calculations, but they don't contain specific data about Verizon's TAM or market share percentage. Let me search more specifically for Verizon market data. Based on the search results, I found specific market share data for Verizon in the telecommunications/wireless sector:\n\n In 2023, Verizon Wireless held a 36.8% share of the US mobile wireless market, though more recent data from December 2024 shows Verizon's market share at 34% .  In mobile technologies specifically, Verizon Wireless has a market share of approximately 26.56% .  For wired telecommunications carriers, Verizon accounts for an estimated 42.3% of total industry revenue .\n\nHowever, the search did not yield specific Total Addressable Market (TAM) data or TAM share percentages for Verizon. The results primarily focused on current market share within existing segments rather than total addressable market calculations or opportunities.","Carrier Revenue":"Based on the search results,  Verizon generated revenues of $134.8 billion in 2024 , representing  an increase over 2023 revenue of $133.97 billion . This reflects  a 0.61% increase from the previous year .\n\nFor the fourth quarter of 2024 specifically,  Verizon reported total operating revenue of $35.7 billion, up 1.6 percent compared to fourth-quarter 2023 .","Market Cap":"Verizon's current market capitalization is approximately $195-199 billion USD as of February 2026 . Multiple sources show slightly different values:  $195.28 billion ,  $198.59 billion , and  $195.27 billion .\n\n This makes Verizon the world's 87th most valuable company .  Over the past 12 months, its market cap has increased by 13.7% .","TM Forum Speakers":"Verizon has participated as a host sponsor and keynote speaker at TM Forum events, featuring 25+ speakers  at the Digital Transformation North America conference.  Key Verizon speakers include Vivek Gurumurthy (Senior VP & CIO, Verizon Consumer Group) , who delivered keynotes on artificial intelligence and algorithmic transformation.  Sudharsan Srinivasan (Senior VP, Technology, Security, Governance & Infrastructure)  spoke at TM Forum's Innovate Americas about scaling AI operations.  Recent events included two Verizon executives: a Senior VP for Technology Strategy Security and Global Infrastructure, and an SVP & CIO Network Systems .  Martin Kessler (VP, Deputy CISO) is scheduled as a speaker at DTW Ignite 2025 .","TM Forum Sponsorship":"Based on my search, I found information about Verizon's relationship with TM Forum, but not about specific sponsorship levels or tiers. Here's what I found:\n\n Verizon is a \"valued and active member\" of TM Forum and has recently achieved \"Running on ODA\" accreditation, joining 17 other major telecommunications companies including AT&T, Deutsche Telekom, Orange, and Vodafone .  TM Forum lists Verizon among the world's top 10 Communications Service Providers (CSPs) in their membership, alongside companies like Vodafone, China Mobile, and AT&T .\n\nHowever, the search results do not contain specific information about Verizon's sponsorship tier level with TM Forum. The results show that  TM Forum offers \"exclusive sponsorship opportunities\" and various sponsorship programs , but Verizon's specific sponsorship level or financial commitment details are not disclosed in the available information.\n\nTo obtain Verizon's exact TM Forum sponsorship tier level, you would likely need to contact TM Forum directly or access their membership/sponsorship documentation.","Catalyst Projects":"Verizon has been actively involved in TM Forum Catalyst projects alongside other major telecommunications companies .  Verizon worked with the TM Forum Catalyst program to drive three Catalyst projects centered on virtualization, including an NFV Ecosystem Enabler . Recent participation includes  championing the \"Telco data space – Phase II\" project with TELUS, involving participants Epam, ETIYA, and Red Hat , and  co-championing the \"Zero-touch digital marketplace – Phase III\" with Colt Technology, Gamestream, The Football Association, and stc . Verizon has also  participated as a champion in the \"Talent for tomorrow\" project alongside BT, CityFibre, Orange, and others . While specific numerical data on total projects isn't available, evidence shows consistent multi-year participation across NFV, marketplace development, and workforce transformation initiatives.","White Papers":"Verizon publishes white papers across multiple telecommunications topics including 5G technology, network security, IoT, healthcare communications, and business solutions.   Recent publications include collaborative efforts with AWS and 5G Future Forum members on Multi-Access Edge Computing.   The company actively participates in 3GPP standards development for 5G security architecture.   As of 2011, Verizon Wireless had 92.2 million retail customers with $70.2 billion annual revenue, representing 63% of Verizon's total revenue.   White papers cover emerging technologies like AI-driven autonomous network operations, cybersecurity frameworks, and private cellular networks for pharmaceutical manufacturing.","Membership Tier":"Based on the search results, I can provide information about Verizon's TM Forum membership status, though specific tier level details are not explicitly mentioned in the results.\n\n Verizon is one of the world's top 10 CSPs in TM Forum's membership , alongside companies like Vodafone, China Mobile, AT&T, Axiata, Deutsche Telekom, Telefonica, China Telecom, and China Unicom.  Verizon is described as \"a valued and active member within TM Forum\" .\n\nWhile the search results don't specify Verizon's exact membership tier level, they show that  Verizon recently achieved \"Running on ODA\" accreditation from TM Forum , becoming  the 18th telco to gain this status .  Verizon joins AT&T, Axiata, BT Group, CityFibre, Deutsche Telekom, Entel Group, Jio, NTT Group, Orange, SES Astra, stc, Telefonica Germany, Telefonica Group, Telia, Telstra, TELUS and Vodafone  in this achievement.\n\nThe specific membership tier level structure for TM Forum is not detailed in the available search results.","News Score":"3","OSS Spend Ranking":"Based on the search results, here are the key findings about Verizon's OSS operational support systems spending and investment:\n\n Verizon reported saving tens of millions of dollars per year in operational costs from deploying a unified OSS platform, specifically saving $11 million annually from multiple EMS \"purchase avoidance\" and $18.5 million yearly from having a single point of integration between the Common Element Management System and other back office systems .\n\n Top supplier spending estimates for 2023 show AWS/Google Cloud at $1.5B combined for OSS/BSS and edge services , indicating significant ongoing investment in cloud-based operational systems.\n\n Verizon's 2025 restructuring targets $1.2 billion in annual operational expense savings , with  increased focus on cloud-native OSS/BSS modernization and AI-driven systems . The company is  currently managing 10,000 network elements through its OSS platform, with capacity licensed for up to 45,000 boxes .","Customer Base":"Based on the latest Verizon financial reports, here are the key subscriber numbers:\n\n**Wireless Subscribers**:  Verizon had 144.8 million wireless retail connections in 2023 , maintaining its position as the largest U.S. wireless carrier with  over 37 percent market share .\n\n**Broadband Subscribers**: As of Q4 2024, Verizon had  more than 12.3 million total broadband connections , including  nearly 4.6 million fixed wireless subscribers .\n\n**Growth Trajectory**: The company has shown consistent growth, with  more than 3 million broadband subscribers added in the last two years  and  15.0 percent year-over-year broadband growth  by end of 2024.\n\nVerizon's total customer base combines approximately 145 million wireless connections with 12.3 million broadband subscribers.","Stock Change YoY":"Based on the search results,  Verizon (VZ) has delivered a 20.50% change over the past year . Additional sources confirm strong year-over-year performance, with  the TTM total return for VZ stock is 18.62%  and  the TTM price compound annual growth rate for VZ stock is 22.40% .\n\nThe stock has shown significant growth, with  a 52-week range between 38.39 and 49.14 , representing substantial upward movement from its yearly low.","Carrier Type":"Verizon is the largest wireless carrier in the United States, with 146.1 million subscribers as of September 30, 2025.   Verizon offers wireless Broadband Internet Access Services for smartphones, basic phones, tablets, netbooks, USB or fixed modems, mobile hotspots, smart watches, connected cars, and other wireless devices over our 5G Ultra Wideband or 5G/4G LTE, or All Access Home Internet broadband networks. \n\n It operates national 5G and 4G LTE networks covering about 99 percent of the U.S. population  and  by 2024, 250 million people were covered by Verizon's 5G Ultra Wideband network.  For fixed wireless access (FWA),  Verizon 5G Home Ultimate offers download speeds of up to 300 Mbps (typical speeds of 85-250 Mbps).   In addition to broadband services like Verizon Fios, which delivers a fiber-optic broadband internet connection but is only available in regions throughout the Northeast.","Regional Market":"Verizon operates nationwide with  67.4% of the United States  geographic coverage. The network serves  more than 326.5 million people, more than 2.56 million square miles, and over 98% of the U.S. population .\n\nFor specific technologies:  Verizon's LTE network is nationwide and covers over 98% of the US population , while  Verizon Wireless still maintains a sizable 4G network across the country, covering 95.73% of the United States .  Verizon's more extensive Nationwide 5G network covers over 230 million people, or just over 69% of the U.S. \n\nRegionally,  Verizon provides 27 states with over 90% of cellular coverage , with particularly strong presence in rural areas where other carriers may lack coverage."},{"Company Name":"AT&T","Website":"https://www.att.com","Stock Ticker":"T","TAM %":"Based on the search results, I found specific information about AT&T's market share but no specific information about their total addressable market (TAM) share percentage. The search results show that \"TAM\" is a general business concept referring to the total market opportunity if a company achieved 100% market share, but don't provide AT&T's specific TAM data.\n\nHere's what I found about AT&T's actual market share:\n\n AT&T has a 27% share of postpaid wireless subscribers in the U.S., lower than Verizon's leading 42% .  The firm has provided around 29 percent of wireless subscriptions delivered by major operators in the U.S. in the second quarter of 2024 .  AT&T is the world's third-largest telecommunications company by revenue, the third largest wireless carrier in the United States behind T-Mobile and Verizon .\n\nHowever, the search results do not contain specific data about AT&T's \"TAM total addressable market share percentage\" as requested. The concept of TAM represents theoretical maximum revenue opportunity if achieving 100% market share, not an actual market share metric that companies typically report.","Carrier Revenue":"Error retrieving data","Market Cap":"AT&T's current market capitalization ranges between approximately  $192.33-$192.34 billion  according to recent data. Some sources report slightly higher figures, with  MacroTrends showing $193.61B as of February 5, 2026  and  Trading Economics reporting $195.41B . The company is classified as a  Large Cap company , with  approximately 7.09 billion outstanding shares trading at around $27.13 per share .  AT&T ranks as the world's 91st most valuable company  by market capitalization.","TM Forum Speakers":"Based on the search results, AT&T has multiple executives speaking at TM Forum events:\n\n AT&T's Andy Markus, SVP and Chief Data Officer, is speaking at Innovate Americas 2025 in a TEN100 Executive Strategy Session on September 10, 2025 .  Jeremy Legg, AT&T's Chief Technology Officer, is a speaker at DTW Ignite 2025 .\n\nAdditionally,  Mike Zeto, General Manager of Smarter Cities at AT&T Inc., presented at TM Forum Digital Transformation ME, specifically in the Agile Operations Live! session at 2:15pm on May 10th .\n\n DTW Ignite features 130+ visionary speakers from leading CxOs to telecoms trailblazers , with AT&T represented among the key technology leadership presenting on AI, autonomous networks, and digital transformation topics.","TM Forum Sponsorship":"Based on the search results, I found specific information about AT&T's status in relation to TM Forum, but no specific details about their exact sponsorship tier level. Here's what I can provide:\n\n AT&T is listed among the world's top 10 CSPs (Communications Service Providers) that are members of TM Forum , alongside companies like Vodafone, China Mobile, Verizon, and Deutsche Telekom. \n\n TM Forum's sponsorship structure includes Diamond, Platinum, Gold, and Silver corporate sponsor tiers , each with specific deliverables like logo placement and marketing materials.\n\nHowever, the search results do not reveal AT&T's specific sponsorship tier level within TM Forum's structure. While AT&T is confirmed as a prominent member organization, their exact sponsorship classification (Diamond, Platinum, Gold, or Silver) is not disclosed in the available information.","Catalyst Projects":"Based on the search results, I can provide information about AT&T's participation in TM Forum Catalyst projects:\n\n AT&T is among the organizations that champion Catalyst projects at TM Forum events , alongside other major operators like BT, China Mobile, Cox Communications, Liberty Global, Orange, Telecom Italia, Telstra, Vodafone and Verizon.\n\nSpecific AT&T involvement includes:\n-  AT&T served as a Champion alongside Telecom Italia and Orange in a 2016 Catalyst project examining Machine Learning Techniques for Next Best Actions (NBAs) in omnichannel delivery, with participants including Ericsson, Infosys, Viavi, SAS, EXFO, and HDS \n-  AT&T was also a Champion with BT and Orange in another project focused on geographic information and sentiment analytics using Twitter data \n-  AT&T is currently partnering with operators like KDDI, Vodafone, and Deutsche Telekom in recent Catalyst projects addressing autonomous network management and wholesale broadband ordering \n\nThe TM Forum Catalyst program requires  a minimum of 2 Champions and 3 paying Participants per project , with  over 1000 industry minds from 250 organizations participating across 50+ current projects .","White Papers":"AT&T publishes telecommunications white papers covering various topics including  strategic roadmaps for enterprise networking, global WAN services , and  cybersecurity insights reports . The company has been  positioned as a Leader in Gartner's Magic Quadrant for Global WAN Services for 21 consecutive times . \n\nAT&T's network handles significant data volumes -  335 petabytes per day during Q4 2019 , which  increased 20% due to COVID-19 . Recent publications include reports on  7 principles of network transformation , focusing on SDN automation and 5G deployment.  All white papers require registration  for download from their corporate website.","Membership Tier":"Based on the search results, I can confirm that  AT&T is listed among the world's top 10 CSPs in TM Forum's membership . However, the search results do not provide specific information about AT&T's exact membership tier level within TM Forum's structure.\n\nThe results show that  AT&T is included among TM Forum's top 10 Communication Service Providers by revenue , alongside companies like Vodafone, China Mobile, Verizon, Deutsche Telekom, and others.  TM Forum has over 800 market-leading member companies , but the specific tier classification or membership level for AT&T is not disclosed in the available information.\n\nTo obtain AT&T's exact TM Forum membership tier level, you would need to contact TM Forum directly or access their member-specific documentation.","News Score":"3","OSS Spend Ranking":"The search results don't contain specific financial data about AT&T's OSS spending or investment amounts. Let me search for more specific investment or expenditure information. Based on the search results, I can provide specific financial information about AT&T's capital investment which includes operational support systems. The search results don't contain specific OSS-only spending figures, but they do show AT&T's overall capital expenditures that would include OSS investments.\n\n AT&T's total capital expenditures were $20.3 billion in 2024 , with  capital investment expected to be in the $21-$22 billion range for 2024 .  The company presents capital investment as a comprehensive view of cash used to invest in networks, product developments and support systems .\n\n AT&T expanded its collaboration with Amdocs under a multi-year managed services agreement to modernize and upgrade its digital business support systems , though specific investment amounts for this OSS initiative weren't disclosed.  AT&T's total operating expenses were $103.29 billion for fiscal year 2024 .\n\nWhile the search didn't yield specific OSS spending figures, AT&T's substantial capital investments in network infrastructure, product development, and support systems indicate significant ongoing investment in operational support systems as part of its broader digital transformation strategy.","Customer Base":"AT&T had 241.53 million total subscribers at the end of 2023 , representing  significant growth over the last decade, more than tripling since 2007 . \n\nThe breakdown includes:  71.26 million postpaid phone subscribers , and  more than 8.5 million fiber customers . Additionally,  AT&T had 13.89 million broadband connections  as of end-2023.\n\nRecent quarter data shows continued growth:  AT&T added 261,000 fiber subscribers in Q1, bringing total fiber customers to 9.6 million .","Stock Change YoY":"Based on the search results, I can provide some information about AT&T's stock performance, though specific year-over-year percentage data isn't clearly available in the results.\n\n AT&T's 52-week high is $29.79 and its 52-week low is $22.95 , representing significant volatility over the past year.  The current price is around $24.69 as of early January 2026 .\n\n By April 2025, the share price had climbed to $29.3, buoyed by successful 5G strategy implementation , suggesting substantial gains during 2025.  In 2025, AT&T's revenue was $125.65 billion, an increase of 2.71% compared to 2024's $122.34 billion, while earnings increased 103.69% .\n\nHowever, the search results don't provide the specific year-over-year percentage change comparing February 2026 to February 2025 stock prices that would give a precise YoY calculation.","Carrier Type":"AT&T is  the third largest wireless carrier in the United States behind T-Mobile and Verizon, and the nation's biggest fiber internet provider . The company has  120.1 million subscribers as of December 31, 2025  for wireless services.\n\nAT&T operates multiple carrier types:\n\n**Mobile Wireless**:  AT&T operates the second-largest 5G network in the U.S. with approximately 30% of the nation covered .  Currently, AT&T offers three 5G plans: Unlimited Starter, Unlimited Extra, and Unlimited Elite. All three plans come with unlimited talk, text, and data in the United States, Mexico, and Canada .\n\n**Fixed Wireless**: AT&T offers  $60 monthly for a 160GB data allowance  with fixed wireless internet.  The company added 221,000 new Internet Air customers in Q4 2025 .\n\n**Broadband/Fiber**:  AT&T expects to reach over 40 million customer locations with fiber services by the end of this year, up from 32 million at the end of 2025 .","Regional Market":"AT&T has a robust nationwide network that covers 78.1% of the United States .  AT&T's LTE network is nationwide and covers over 99% of the U.S. population . For 5G coverage,  AT&T 5G covers 43.3% of the U.S. , making it the carrier with  the most 5G coverage in the United States .\n\nIn terms of 4G LTE geographic coverage,  AT&T currently boasts the widest 4G LTE reach, covering about 58% of the U.S. landmass .  AT&T reported revenues of roughly 122 billion U.S. dollars worldwide in 2023, with the vast majority generated in the United States , indicating its primary market focus.  Just over 290 million people are covered by AT&T's low-band 5G network ."},{"Company Name":"Deutsche Telekom","Website":"https://www.telekom.com","Stock Ticker":"DTE.DE","TAM %":"The search results provide general information about Total Addressable Market (TAM) concepts and calculations, but do not contain specific data about Deutsche Telekom's TAM or market share percentage. Let me search more specifically for Deutsche Telekom market data. Based on the search results, I found relevant information about Deutsche Telekom but no specific TAM (Total Addressable Market) percentage data. Let me provide what specific market data is available:\n\nBased on the available data, specific Deutsche Telekom TAM (Total Addressable Market) percentage figures are not publicly disclosed in the search results. However, here are the key market position facts:\n\n Deutsche Telekom is the world's fifth-largest telecommunications company and biggest in Europe by revenue.   As of Q4 2023, Deutsche Telekom had roughly 61.4 million mobile customers in Germany and over 47 million mobile customers in the rest of Europe. \n\n The Europe Telecom market size was valued at USD 14.47 billion in 2024, estimated to reach USD 31.59 billion by 2033.   The German telecom market specifically is forecasted to expand from USD 77.25 billion in 2023 to USD 101.10 billion by 2028. \n\nWhile exact TAM market share percentages aren't available,  Deutsche Telekom holds a dominant position in the B2B market in Germany, with revenues of €14.2 billion in 2024.","Carrier Revenue":"Error retrieving data","Market Cap":"Error retrieving data","TM Forum Speakers":"Based on the search results, Deutsche Telekom has multiple speakers at TM Forum events. At the upcoming DTW Ignite event,  Deutsche Telekom has two confirmed speakers: Laurent Donnay (Chief Engineering Officer DT) participating in the Composable IT & Ecosystems Pathway, and Peter Leukert (CIO, Managing Director) delivering a keynote presentation . The event features  130+ visionary speakers  total from leading industry executives.\n\nAdditionally,  Klaus Martiny from Deutsche Telekom serves as ETSI ZSM chair and has presented ETSI ZSM updates at TM Forum events .  Heinz Sandermann, Senior BSS Solution Architect at Deutsche Telekom IT GmbH, has been a speaker at TM Forum Digital Transformation ME events .  Steffen Roehn, who previously served on the TM Forum board during his time at Deutsche Telekom, continues his involvement with the organization .","TM Forum Sponsorship":"Based on my search results, I cannot find specific information about Deutsche Telekom's sponsorship level or tier within TM Forum. The search results reveal that:\n\n Deutsche Telekom is one of the world's top 10 Communication Service Providers (CSPs) that are TM Forum members , alongside companies like Vodafone, China Mobile, AT&T, and Verizon.  Deutsche Telekom Group CIO Kanwardeep \"KD\" Singh sits on TM Forum's Board of Trustees and the Mission Board for Composable IT and Ecosystems .\n\nHowever, the search results do not contain specific information about sponsorship tiers, levels, or Deutsche Telekom's exact sponsorship status with TM Forum.  TM Forum has over 800 member organizations , but the membership structure and specific sponsorship levels are not detailed in the available information.\n\nThe search results focus more on Deutsche Telekom's active participation in TM Forum activities and board positions rather than financial sponsorship arrangements or tier classifications.","Catalyst Projects":"Based on the search results, Deutsche Telekom has been actively participating in multiple TM Forum Catalyst projects across different years:\n\n Deutsche Telekom serves as a Champion in several current Catalyst projects, including \"Empowering Business Assurance with Artificial Intelligence – Phase II\" alongside BT Group, FASTWEB, Orange, and Telia, and \"AI-powered legacy modernization to ODA\" with BT Group, Etisalat UAE, Indosat Ooredoo Hutchison, and others. \n\n Deutsche Telekom participates in broadband access environment projects alongside companies like Vodafone Group, Telin, BT Group, Deutsche Glasfaser, Lyse, and Cityfibre, and collaborates with top-tier operators like KDDI, Vodafone, and AT&T in autonomous network management initiatives. \n\n Deutsche Telekom is among the CSPs participating in the multi-vendor, multi-agent autonomous networks Catalyst, which includes participants spanning globally: AIS, China Unicom, Du, Orange, IOH, MTN, Telenor, TIM, Telefónica, Vodafone and ZAIN. \n\n Deutsche Telekom is also among the new signees that have adopted TM Forum's Open APIs, joining AT&T, China Telecom, and Salesforce. \n\nWhile specific numerical data on total project count isn't provided, Deutsche Telekom demonstrates consistent, multi-year participation as both Champion and participant across various technology domains including AI, autonomous networks, and digital architecture transformation.","White Papers":"Based on my search results, Deutsche Telekom publishes several types of telecommunications white papers and publications:\n\n Deutsche Telekom publishes \"reports, studies and publications by Deutsche Telekom Group as well as selected speeches of board members.\"   The company published a position paper on the EU White Paper on the Future of Digital Infrastructure in June 2024 (149.5 KB PDF). \n\n Their business division produces technical white papers including topics on Zero Trust security infrastructure modernization  and  Premium Zero Trust networking approaches that unify networking and security. \n\nRecent publications include studies on AI assistants (October 2024) and startup AI innovation (December 2021), plus annual Corporate Responsibility reports and HR Factbooks with employee statistics.  The company serves more than 184 million mobile customers and has presence in over 50 countries,  providing substantial operational data for their telecommunications research and white papers.","Membership Tier":"Based on the search results, I can provide information about Deutsche Telekom's involvement with TM Forum, but specific membership tier levels are not clearly defined or disclosed in the available information.\n\n Deutsche Telekom is listed among the world's top 10 CSPs (Communications Service Providers) in TM Forum membership , alongside companies like Vodafone, China Mobile, AT&T, and Verizon.  Deutsche Telekom Group CIO Kanwardeep \"KD\" Singh was recently appointed to TM Forum's Board of Trustees  and  sits on the Mission Board for Composable IT and Ecosystems .\n\n TM Forum uses a membership-tier-dependent system with adoption thresholds indicated via a 'points based' metric , but Deutsche Telekom's specific tier level is not disclosed in publicly available information. The company is actively engaged in TM Forum initiatives,  having signed up for the Open Digital Architecture Manifesto  and participating in various collaborative projects.\n\nThe search results do not contain specific numerical data about Deutsche Telekom's exact membership tier level within TM Forum's structure.","News Score":"7","OSS Spend Ranking":"Based on the search results, I found limited specific spending or investment figures for Deutsche Telekom's OSS investments. Here's what was found:\n\n Deutsche Telekom designed and built from scratch a new OSS system for fiber in nine months , demonstrating significant investment in custom OSS development rather than purchasing off-the-shelf solutions.  The company realized it would be faster and more efficient to develop an in-house OSS that was tailored to the regulatory constraints and service requirements of the German fiber market .\n\n Deutsche Telekom incorporated Netcracker's TOMS solution as part of its OSS architecture transformation that emphasized simplification and automation of the operations and management of its next-generation network . The company also  signed a long-term contract for the ongoing support and maintenance of the billing solution for its fixed network in Germany .\n\nAdditionally,  Deutsche Telekom needed to integrate commercial and technical data from various Business Support Systems (BSS), Operations Support Systems (OSS) and Enterprise Resource Platforms (ERP)  for their B2B SD-X products.\n\nHowever, no specific monetary figures for OSS spending or investment amounts were found in the available sources.","Customer Base":"Based on the search results, here are the key facts about Deutsche Telekom's customer base:\n\n Deutsche Telekom had over 259 million total customers in the second quarter of 2024 , showing significant growth from  approximately 179.1 million customers in the first quarter of 2019 .\n\nFor mobile services specifically,  Deutsche Telekom had roughly 61.42 million active mobile phone connections in Germany as of the end of 2023 . In Europe outside of Germany,  they had over 47 million mobile customers, with the largest share in Poland at over 12 million .\n\n At the end of 2023, Deutsche Telekom had a total of 47.9 million mobile customers in the Europe operating segment , while maintaining their position as  the largest operator in Germany by revenue  and accounting for  approximately one-third of the German mobile market when measured by active SIM cards .","Stock Change YoY":"Based on the search results, here are the key year-over-year performance figures for Deutsche Telekom stock:\n\n Deutsche Telekom stock decreased 11.25% over the last 12 months .  Deutsche Telekom AG has delivered a -6.170% change over the past year , though there appears to be some variation in the exact figures from different sources.\n\n In 2024, the stock closed the year at €28.89, representing a 32.8% annual gain , but this strong performance was followed by declines in 2025.  The price eased from above €30 in early 2025 to the high-€20s towards year-end, trading just below €28 by December 30, 2025 .\n\nCurrently,  Deutsche Telekom is trading at €30.20 as of February 11, 2026 .","Carrier Type":"Deutsche Telekom is  the world-wide largest telecommunications provider by revenue  offering comprehensive services across multiple network types. The company operates  mobile and fixed-line telephony, internet access, and cloud solutions  with  mobile networks and 5G as well as optical fiber .\n\n**Key Network Statistics:**\n- **Mobile subscribers:**  69.8 million customers in Germany \n- **Fixed-line customers:**  17 million fixed-line subscribers \n- **Broadband connections:**  over 9 million broadband lines \n\n**Network Technologies:**\n- Mobile: GSM, UMTS, LTE, and 5G networks\n- Fixed-line:  DIA supports bandwidths from 2 Mbps to 10 Gbps \n- Hybrid solutions:  combines up to 300 Mbit/s LTE coverage with existing fixed network speed \n- Wireless access:  FWA offers maximum bandwidth (50 Mbps down / 10 Mbps up) \n\nDeutsche Telekom provides integrated telecommunications services combining mobile, fixed-line, and broadband technologies across Germany and internationally.","Regional Market":"Deutsche Telekom has  extensive geographical market presence with strategic focus on Germany, Europe, and North America . The company  operates in many European countries  with  operations in Germany as home market plus nine national companies . \n\nIn Germany, Deutsche Telekom holds  45% of total telecom revenue market share in 2024  and  70% of broadband connections . Its  5G network covered 98.3% of German population by March 2025 .\n\nAcross  12 European countries, organic revenue reached €12.3 billion in 2024 , with  79% average population coverage for 5G by March 2025 .  North America accounts for 64.9% of net sales through T-Mobile US ."},{"Company Name":"Vodafone","Website":"https://www.vodafone.com","Stock Ticker":"VOD","TAM %":"I notice the search results provide general information about TAM (Total Addressable Market) concepts but don't contain specific data about Vodafone's TAM or market share percentage. Let me search more specifically for Vodafone market data. Based on the search results, I found information about Vodafone's market share in various countries and revenue data, but no specific information about their Total Addressable Market (TAM) share percentage. Here's a concise summary of available data:\n\n Vodafone reported revenues of 36.7 billion euros in its 2023 financial year , and  the company ranked 27th in a 2024 ranking of global telecommunications companies by market capitalization .  By 2024, the company counted more than 330 million mobile customers worldwide .\n\nRegarding regional market shares:  In 2020, Vodafone held a 20.5 percent share of the mobile market in the United Kingdom, while in South Africa the company held 46.6 percent of the market .  In 2020 Vodafone had a 28 percent mobile market share in India and a 32.3 percent mobile market share in Italy .  Vodafone was ranked ninth in the list of the most valuable telecommunications brands in the world in 2024 .\n\nHowever, specific TAM percentage data for Vodafone's total addressable market share was not found in the available sources. The company's global market position appears strong in regional markets but comprehensive TAM analysis would require additional industry-specific data.","Carrier Revenue":"Error retrieving data","Market Cap":"Error retrieving data","TM Forum Speakers":"Error retrieving data","TM Forum Sponsorship":"Error retrieving data","Catalyst Projects":"Error retrieving data","White Papers":"Vodafone maintains an extensive collection of telecommunications white papers covering various technology areas.  The company has published multiple Open RAN research reports, including \"Open RAN Technical Priorities\" releases from 2021 through Release 4 , developed in collaboration with major European operators.\n\nKey publications include  joint white papers with DOCOMO on Open RAN systems integration  and  an \"Open RAN Security White Paper\" created with Deutsche Telekom, Orange, Telefónica, and TIM .  Vodafone targets implementing Open RAN at 30% of its over 100,000 European sites by 2030 .\n\nThe company also publishes specialized papers on  CaaS performance benchmarking with 379-429 test cases ,  IoT technologies comparing NB-IoT, LTE-M, and other standards , and mobile security topics. These white papers serve as technical guidance for operators, vendors, and the broader telecommunications ecosystem.","Membership Tier":"Based on the search results, I cannot find specific information about Vodafone's TM Forum membership tier level. The search results show that  Vodafone is listed among the world's top 10 CSPs in TM Forum's membership , but no specific tier level or membership category is provided.\n\nThe results show Vodafone is actively engaged with TM Forum, including  Vodafone New Zealand as a new member  and  Vodafone's role as a founder of TM Forum's Open Digital Architecture (ODA) . However, the specific membership tier information is not available in the search results.","News Score":"3","OSS Spend Ranking":"Based on the search results, here are the key facts about Vodafone's OSS spending and investment:\n\n Vodafone achieved a 47% CAPEX reduction and 68% OPEX reduction through replacement of 3 former Fault & Service Management systems, plus >30% cost savings for future OSS integrations .  The Group set a five-year target to reduce 1,200 OSS applications down to 600 , representing an aggressive consolidation effort.\n\n Vodafone Group set a 3-year goal of reducing 80% of the effort allocated to first-line support activities through automation .  Accenture invested €150m for a minority stake in a strategic partnership to commercialize Vodafone's shared operations , including OSS capabilities.\n\n The company is modernizing \"thousands of Oracle databases\" and scaling its \"mission-critical\" OSS and BSS systems through a dedicated cloud platform , though specific spending amounts weren't disclosed in the Oracle deal.","Customer Base":"Based on the search results, here are the key facts about Vodafone's customer base:\n\n In the 2023/24 financial year, Vodafone had over 30 million mobile customers in Germany and over 18 million in the United Kingdom, with approximately 156.7 million mobile customers in Africa .  Vodafone's Africa segment had 98.5 million customers as of 2023 .\n\n As of Q1 2024/25, Vodafone had around 72.3 million mobile customers in Europe . For specific regional breakdowns:  Vodafone Idea in India has 199.8 million total customers as of Q3 FY25 , while  Vodafone Idea's wireless subscriber base was approximately 223 million as of December 2023 .\n\n Vodafone provides telecoms networks in 17 markets worldwide, with stakes in five additional markets through joint ventures, and presence in 46 markets through partnerships . The company  reported over 85,000 employees globally as of 2023 .","Stock Change YoY":"Based on the search results, I can provide you with specific year-over-year percentage changes for Vodafone stock:\n\n Vodafone Group PLC (VOD) has delivered a 27.150% change over the past year , according to Investing.com data.\n\nAdditionally,  The Vodafone share price increased by 41.4% last year  (referring to 2025 performance), and  VOD jumped to a high of 116p this week, up by over 110% from its lowest level in 2024 .\n\nThe stock has shown strong recent momentum with  the price up by 12.96% over the past 2 weeks  and  has risen 15.71% since a buy signal was issued from a pivot bottom point on Tuesday, January 13, 2026 .\n\n**Summary**: Vodafone stock has delivered approximately 27-41% year-over-year gains, with exceptional recovery from 2024 lows showing over 110% growth.","Carrier Type":"Vodafone is  a British multinational telecommunications company  offering comprehensive mobile, fixed line, and broadband services.  As of January 2025, Vodafone owns and operates networks in 15 countries, with partner networks in 46 further countries .\n\nKey services include:\n- **Mobile**: 4G and 5G networks covering  99% of the UK \n- **Fixed Broadband**:  One of Europe's largest broadband networks with over 18m customers  \n- **IoT**:  Over 205 million IoT connections globally \n- **Carrier Services**:  Global wholesale telecommunications service provider offering connectivity and messaging solutions \n\n Market-leading digital services, including next-generation 5G, Internet of Things devices, converged mobile, broadband and TV  support business and consumer customers across multiple market segments.","Regional Market":"Vodafone operates as a global telecommunications company with extensive regional coverage.  The British giant provides telecoms networks in 17 markets worldwide, with stakes in a further five markets through joint venture agreements, and a presence in an additional 46 markets through partnerships with local operators.   Vodafone Global Enterprise operates in over 65 countries , organized into five geographical divisions.\n\nKey regional presence includes:  over 30 million mobile customers in Germany and over 18 million in the United Kingdom, with around 156.7 million mobile customers in Africa .  Vodafone is driving digital transformation across nine countries in Europe; six in Africa; a further five through joint ventures and associates; and over 40 more through partners."},{"Company Name":"Orange","Website":"https://www.orange.com","Stock Ticker":"ORA.PA","TAM %":"Error retrieving data","Carrier Revenue":"Error retrieving data","Market Cap":"Error retrieving data","TM Forum Speakers":"Error retrieving data","TM Forum Sponsorship":"Error retrieving data","Catalyst Projects":"Error retrieving data","White Papers":"Error retrieving data","Membership Tier":"Based on the search results, I can provide information about Orange's involvement with TM Forum, though the specific membership tier level is not explicitly stated in the search results.\n\n Orange S.A. is listed as a current member of TM Forum . More significantly,  Orange has high-level representation on TM Forum's Board of Trustees through Koen Vermeulen, Group CIO & Senior Vice President Orange Innovation IT & Services . Additionally,  Orange is one of the founding members of TM Forum's autonomous networks project and has committed to achieving TM Forum's Level 4 Autonomous Networks (AN) by 2025 .\n\nWhile the exact membership tier level isn't specified in the search results, Orange's board representation and founding member status in key initiatives suggests they hold a premium membership level with TM Forum.  TM Forum has 850+ member companies , and  includes the world's top 10 CSPs in its membership , positioning Orange among the organization's most significant members.","News Score":"3","OSS Spend Ranking":"Based on the search results, I found limited specific information about Orange's OSS spending or investment amounts. Here's what I found:\n\n Orange Polska signed a six-year deal with Ericsson for OSS transformation and optimization, which included consulting, systems integration, and an OSS software suite covering network planning, inventory fulfillment, and assurance domains. The suite was designed to enable Orange to process operational data faster and deploy new tools cost-effectively. \n\n Flyaps, a software development company, mentions helping major telecom players like Orange make their operations smarter through cloud migration and telecom-specific AI solutions.   David Morel, Senior Systems Architect at Orange, described modern OSS as \"a living organism that learns from the network and tunes itself constantly.\" \n\nHowever, the search results did not reveal specific spending figures, investment amounts, or financial data for Orange's OSS investments. The available information focuses on general OSS market trends rather than Orange-specific financial commitments to operational support systems.","Customer Base":"Based on the search results, here's the most current data on Orange's customer base:\n\n Orange Group has a total customer base of 291 million customers worldwide at 31 December 2024, including 253 million mobile customers and 22 million fixed broadband customers.   The Group is present in 26 countries. \n\nLooking at recent trends,  Orange reported approximately 284 million customers at the end of 2022 across 26 countries.   Orange provides services to millions of customers in 26 countries worldwide, with over 137 thousand employees globally as of 2023. \n\nIn France specifically,  Orange had around 36.9 million mobile service customers in France in 2023.   In Spain, there were over 17.7 million mobile subscribers in the same year. \n\nOrange's customer base has grown consistently from  259 million customers in 2020  to the current 291 million in 2024.","Stock Change YoY":"Based on the search results, Orange stock has shown strong year-over-year performance.  Orange stock has gained 44.98% over the 1-year period . Additionally,  Orange stock price has risen 16.90% since the beginning of 2026 , indicating continued positive momentum into the current year.\n\nThe stock is currently trading around  €14.66 as of January 8, 2026 , with  a 52-week high of $18.88 and 52-week low of $10.70 . This represents significant year-over-year gains for Orange shareholders.","Carrier Type":"Orange S.A. is a major European telecommunications carrier offering comprehensive services.  Orange has been the corporation's main brand for mobile, landline, internet and Internet Protocol television (IPTV) services since 2006.  The company serves  244 million customers at December 31, 2014, including 185 million mobile customers and 16 million fixed broadband customers. \n\nKey network capabilities include:  European leader in very-high-speed broadband with more than 75 million homes connectable to optical fibre around the world at the end of 2023.  Orange operates  a vast international carrier network and 450,000 kilometres of submarine cables  and maintains  wholesale services to over 220 countries and territories  as a global provider of security, data, mobile and voice services.","Regional Market":"Based on the search results, here's a concise overview of Orange regional market presence and geographic coverage:\n\n**Regional Market Share:**\n Asia-Pacific leads with 35.7% of global orange market share in 2025 .  Orange (telecommunications) demonstrates robust presence across Europe and Africa, with the Africa & Middle East region contributing 12.8% revenue increase in H1 2025 .\n\n**Key Geographic Coverage:**\n- **Orange Telecom**:  Leading position in France (mobile telecommunications) ,  Orange Money serving 41.1 million active customers in Africa and Middle East as of Q1 2025 \n- **Citrus Orange Markets**:  North America holds over 40% of global revenue ,  US market valued at USD 1.24 billion in 2024 \n- **Growth Regions**:  Africa projected to expand at 4.5% CAGR (2026-2031) ,  Asia Pacific expected to witness highest revenue share \n\n**Market Size**:  Global orange market valued at USD 47.01 billion in 2024, projected to reach USD 62.69 billion by 2033 ."}];
+        
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+        
+        const colors = ['#e94560', '#0f3460', '#16213e', '#533483', '#f07167', '#00d4aa', '#fca311', '#14213d', '#6a994e', '#bc4749'];
+        const chartDefaults = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#f1f1f1' }}},
+            scales: {
+                x: { ticks: { color: '#a8a8a8' }, grid: { color: '#374151' }},
+                y: { ticks: { color: '#a8a8a8' }, grid: { color: '#374151' }}
+            }
+        };
+        
+        function getNum(val) { const num = parseFloat(val); return isNaN(num) ? 0 : num; }
+        
+        // Overview: Coverage vs Sentiment Matrix
+        new Chart(document.getElementById('overviewNewsMatrixChart'), {
+            type: 'scatter',
+            data: {
+                datasets: summaryData.map((s, i) => ({
+                    label: s['Company Name'],
+                    data: [{
+                        x: getNum(s['News Article Count']),
+                        y: getNum(s['News Sentiment Score']),
+                    }],
+                    backgroundColor: getNum(s['News Sentiment Score']) >= 0 ? '#10b981cc' : '#ef4444cc',
+                    borderColor: getNum(s['News Sentiment Score']) >= 0 ? '#10b981' : '#ef4444',
+                    borderWidth: 2,
+                    pointRadius: 8,
+                    pointHoverRadius: 11,
+                }))
+            },
+            options: {
+                ...chartDefaults,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const s = summaryData[context.datasetIndex];
+                                return [
+                                    s['Company Name'],
+                                    'Articles: ' + context.raw.x,
+                                    'Sentiment: ' + (context.raw.y > 0 ? '+' : '') + context.raw.y
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Article Count', color: '#a8a8a8' },
+                        ticks: { color: '#a8a8a8' },
+                        grid: { color: '#374151' }
+                    },
+                    y: {
+                        title: { display: true, text: 'Sentiment Score', color: '#a8a8a8' },
+                        ticks: { color: '#a8a8a8' },
+                        grid: {
+                            color: (ctx) => ctx.tick.value === 0 ? '#e9456066' : '#374151'
+                        }
+                    }
+                }
+            }
+        });
+        
+        new Chart(document.getElementById('marketCapChart'), {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Carriers',
+                    data: summaryData.map(s => ({ x: getNum(s['Carrier Revenue ($B)']), y: getNum(s['Market Cap ($B)']), company: s['Company Name'] })),
+                    backgroundColor: '#e94560'
+                }]
+            },
+            options: { ...chartDefaults, plugins: { tooltip: { callbacks: { label: (context) => context.raw.company + ': Revenue $' + context.raw.x + 'B, Market Cap $' + context.raw.y + 'B' }}}}
+        });
+        
+        const countries = {};
+        summaryData.forEach(s => { const country = s['Primary Country']; countries[country] = (countries[country] || 0) + 1; });
+        new Chart(document.getElementById('geoChart'), {
+            type: 'doughnut',
+            data: { labels: Object.keys(countries), datasets: [{ data: Object.values(countries), backgroundColor: colors }]},
+            options: { ...chartDefaults, plugins: { legend: { position: 'right', labels: { color: '#a8a8a8' }}}}
+        });
+        
+        // TM Forum Engagement Bubble Chart
+        // Bubble size = Sponsorship Score, Color = White Papers count
+        const maxWhitePapers = Math.max(...summaryData.map(s => getNum(s['White Papers'])), 1);
+        
+        function whitePapersColor(count) {
+            const ratio = count / maxWhitePapers;
+            if (ratio >= 0.75) return '#00d4aa';
+            if (ratio >= 0.50) return '#fca311';
+            if (ratio >= 0.25) return '#e94560';
+            return '#533483';
+        }
+        
+        new Chart(document.getElementById('engagementChart'), {
+            type: 'bubble',
+            data: {
+                datasets: summaryData.map((s, i) => ({
+                    label: s['Company Name'],
+                    data: [{
+                        x: getNum(s['Catalyst Projects']),
+                        y: getNum(s['TM Forum Speakers']),
+                        r: Math.max(6, getNum(s['TM Forum Sponsorship Score']) / 8),
+                    }],
+                    backgroundColor: whitePapersColor(getNum(s['White Papers'])) + 'cc',
+                    borderColor: whitePapersColor(getNum(s['White Papers'])),
+                    borderWidth: 2,
+                    whitepapers: getNum(s['White Papers'])
+                }))
+            },
+            options: {
+                ...chartDefaults,
+                plugins: {
+                    legend: { 
+                        display: true,
+                        labels: { 
+                            color: '#a8a8a8',
+                            generateLabels: () => [
+                                { text: 'White Papers: High (75-100%)', fillStyle: '#00d4aa', strokeStyle: '#00d4aa', lineWidth: 2, fontColor: '#a8a8a8' },
+                                { text: 'White Papers: Medium (50-75%)', fillStyle: '#fca311', strokeStyle: '#fca311', lineWidth: 2, fontColor: '#a8a8a8' },
+                                { text: 'White Papers: Low (25-50%)',  fillStyle: '#e94560', strokeStyle: '#e94560', lineWidth: 2, fontColor: '#a8a8a8' },
+                                { text: 'White Papers: Minimal (0-25%)', fillStyle: '#533483', strokeStyle: '#533483', lineWidth: 2, fontColor: '#a8a8a8' },
+                            ]
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const s = summaryData[context.datasetIndex];
+                                return [
+                                    s['Company Name'],
+                                    'Catalysts: ' + getNum(s['Catalyst Projects']),
+                                    'Speakers: ' + getNum(s['TM Forum Speakers']),
+                                    'Sponsorship: ' + getNum(s['TM Forum Sponsorship Score']),
+                                    'White Papers: ' + getNum(s['White Papers'])
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Catalyst Projects', color: '#a8a8a8' },
+                        ticks: { color: '#a8a8a8' },
+                        grid: { color: '#374151' }
+                    },
+                    y: {
+                        title: { display: true, text: 'Speakers', color: '#a8a8a8' },
+                        ticks: { color: '#a8a8a8' },
+                        grid: { color: '#374151' }
+                    }
+                }
+            }
+        });
+        
+        // Financial Charts
+        new Chart(document.getElementById('revenueBarChart'), { type: 'bar', data: { labels: summaryData.map(s => s['Company Name']), datasets: [{ label: 'Revenue ($B)', data: summaryData.map(s => getNum(s['Carrier Revenue ($B)'])), backgroundColor: '#e94560' }]}, options: chartDefaults });
+        new Chart(document.getElementById('marketCapBarChart'), { type: 'bar', data: { labels: summaryData.map(s => s['Company Name']), datasets: [{ label: 'Market Cap ($B)', data: summaryData.map(s => getNum(s['Market Cap ($B)'])), backgroundColor: '#0f3460' }]}, options: chartDefaults });
+        new Chart(document.getElementById('stockChart'), { type: 'bar', data: { labels: summaryData.map(s => s['Company Name']), datasets: [{ label: 'Stock Change YoY (%)', data: summaryData.map(s => getNum(s['Stock Change YoY (%)'])), backgroundColor: summaryData.map(s => getNum(s['Stock Change YoY (%)']) >= 0 ? '#10b981' : '#ef4444') }]}, options: chartDefaults });
+        new Chart(document.getElementById('tamChart'), { type: 'bar', data: { labels: summaryData.map(s => s['Company Name']), datasets: [{ label: 'TAM %', data: summaryData.map(s => getNum(s['TAM (%)'])), backgroundColor: '#533483' }]}, options: chartDefaults });
+        
+        // Customer Charts
+        new Chart(document.getElementById('customerSegmentChart'), { type: 'bar', data: { labels: summaryData.map(s => s['Company Name']), datasets: [{ label: 'Mobile (M)', data: summaryData.map(s => getNum(s['Customers - Mobile (M)'])), backgroundColor: '#e94560' }, { label: 'Broadband (M)', data: summaryData.map(s => getNum(s['Customers - Broadband (M)'])), backgroundColor: '#0f3460' }, { label: 'Enterprise (M)', data: summaryData.map(s => getNum(s['Customers - Enterprise (M)'])), backgroundColor: '#00d4aa' }]}, options: { ...chartDefaults, scales: { x: { ...chartDefaults.scales.x, stacked: true }, y: { ...chartDefaults.scales.y, stacked: true }}}});
+        new Chart(document.getElementById('mobileChart'), { type: 'bar', data: { labels: summaryData.map(s => s['Company Name']), datasets: [{ label: 'Mobile Subscribers (M)', data: summaryData.map(s => getNum(s['Customers - Mobile (M)'])), backgroundColor: '#e94560' }]}, options: chartDefaults });
+        new Chart(document.getElementById('broadbandChart'), { type: 'bar', data: { labels: summaryData.map(s => s['Company Name']), datasets: [{ label: 'Broadband Subscribers (M)', data: summaryData.map(s => getNum(s['Customers - Broadband (M)'])), backgroundColor: '#0f3460' }]}, options: chartDefaults });
+        new Chart(document.getElementById('enterpriseChart'), { type: 'bar', data: { labels: summaryData.map(s => s['Company Name']), datasets: [{ label: 'Enterprise Customers (M)', data: summaryData.map(s => getNum(s['Customers - Enterprise (M)'])), backgroundColor: '#00d4aa' }]}, options: chartDefaults });
+        
+        // TM Forum Charts
+        new Chart(document.getElementById('sponsorshipChart'), { type: 'bar', data: { labels: summaryData.map(s => s['Company Name']), datasets: [{ label: 'Sponsorship Score', data: summaryData.map(s => getNum(s['TM Forum Sponsorship Score'])), backgroundColor: '#e94560' }]}, options: chartDefaults });
+        new Chart(document.getElementById('speakersChart'), { type: 'bar', data: { labels: summaryData.map(s => s['Company Name']), datasets: [{ label: 'Speakers', data: summaryData.map(s => getNum(s['TM Forum Speakers'])), backgroundColor: '#0f3460' }]}, options: chartDefaults });
+        new Chart(document.getElementById('catalystChart'), { type: 'bar', data: { labels: summaryData.map(s => s['Company Name']), datasets: [{ label: 'Catalyst Projects', data: summaryData.map(s => getNum(s['Catalyst Projects'])), backgroundColor: '#533483' }]}, options: chartDefaults });
+        new Chart(document.getElementById('whitePapersChart'), { type: 'bar', data: { labels: summaryData.map(s => s['Company Name']), datasets: [{ label: 'White Papers', data: summaryData.map(s => getNum(s['White Papers'])), backgroundColor: '#00d4aa' }]}, options: chartDefaults });
+        
+        // News Charts
+        new Chart(document.getElementById('newsCountChart'), { type: 'bar', data: { labels: summaryData.map(s => s['Company Name']), datasets: [{ label: 'Article Count', data: summaryData.map(s => getNum(s['News Article Count'])), backgroundColor: '#fca311' }]}, options: chartDefaults });
+        new Chart(document.getElementById('sentimentChart'), { type: 'bar', data: { labels: summaryData.map(s => s['Company Name']), datasets: [{ label: 'Sentiment Score', data: summaryData.map(s => getNum(s['News Sentiment Score'])), backgroundColor: summaryData.map(s => getNum(s['News Sentiment Score']) >= 0 ? '#10b981' : '#ef4444') }]}, options: chartDefaults });
+        new Chart(document.getElementById('newsMatrixChart'), { type: 'scatter', data: { datasets: [{ label: 'Carriers', data: summaryData.map(s => ({ x: getNum(s['News Article Count']), y: getNum(s['News Sentiment Score']), company: s['Company Name'] })), backgroundColor: '#e94560' }]}, options: { ...chartDefaults, plugins: { tooltip: { callbacks: { label: (context) => context.raw.company + ': ' + context.raw.x + ' articles, Sentiment: ' + context.raw.y }}}}});
+        
+        let sortColumn = -1;
+        let sortAsc = true;
+        function sortTable(col) {
+            const table = document.getElementById('dataTable');
+            const tbody = table.getElementsByTagName('tbody')[0];
+            const rows = Array.from(tbody.getElementsByTagName('tr'));
+            sortAsc = (sortColumn === col) ? !sortAsc : true;
+            sortColumn = col;
+            table.querySelectorAll('th').forEach(th => { th.classList.remove('sorted-asc', 'sorted-desc'); });
+            const th = table.getElementsByTagName('th')[col];
+            th.classList.add(sortAsc ? 'sorted-asc' : 'sorted-desc');
+            rows.sort((a, b) => {
+                const aVal = a.getElementsByTagName('td')[col].textContent;
+                const bVal = b.getElementsByTagName('td')[col].textContent;
+                const aNum = parseFloat(aVal);
+                const bNum = parseFloat(bVal);
+                if (!isNaN(aNum) && !isNaN(bNum)) { return sortAsc ? aNum - bNum : bNum - aNum; }
+                return sortAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+            });
+            rows.forEach(row => tbody.appendChild(row));
+        }
+        
+        function showDetails(index) {
+            const summary = summaryData[index];
+            const raw = rawData[index];
+            const html = `
+                <h2>${summary['Company Name']}</h2>
+                <p style="color: var(--text-muted); margin-bottom: 20px;">${summary['Primary Country']}</p>
+                <div class="detail-grid">
+                    <div class="detail-item"><div class="detail-label">Revenue</div><div class="detail-value">$${summary['Carrier Revenue ($B)']}B</div></div>
+                    <div class="detail-item"><div class="detail-label">Market Cap</div><div class="detail-value">$${summary['Market Cap ($B)']}B</div></div>
+                    <div class="detail-item"><div class="detail-label">TAM</div><div class="detail-value">${summary['TAM (%)']}%</div></div>
+                    <div class="detail-item"><div class="detail-label">Stock Change YoY</div><div class="detail-value ${getNum(summary['Stock Change YoY (%)']) >= 0 ? 'positive' : 'negative'}">${summary['Stock Change YoY (%)']}%</div></div>
+                    <div class="detail-item"><div class="detail-label">Mobile Customers</div><div class="detail-value">${summary['Customers - Mobile (M)']}M</div></div>
+                    <div class="detail-item"><div class="detail-label">Broadband Customers</div><div class="detail-value">${summary['Customers - Broadband (M)']}M</div></div>
+                    <div class="detail-item"><div class="detail-label">Enterprise Customers</div><div class="detail-value">${summary['Customers - Enterprise (M)']}M</div></div>
+                    <div class="detail-item"><div class="detail-label">TM Forum Sponsorship</div><div class="detail-value">${summary['TM Forum Sponsorship Score']}</div></div>
+                    <div class="detail-item"><div class="detail-label">Speakers</div><div class="detail-value">${summary['TM Forum Speakers']}</div></div>
+                    <div class="detail-item"><div class="detail-label">Catalyst Projects</div><div class="detail-value">${summary['Catalyst Projects']}</div></div>
+                    <div class="detail-item"><div class="detail-label">White Papers</div><div class="detail-value">${summary['White Papers']}</div></div>
+                    <div class="detail-item"><div class="detail-label">News Coverage</div><div class="detail-value">${summary['News Article Count']} articles</div></div>
+                    <div class="detail-item"><div class="detail-label">News Sentiment</div><div class="detail-value ${getNum(summary['News Sentiment Score']) >= 0 ? 'positive' : 'negative'}">${summary['News Sentiment Score']}</div></div>
+                </div>
+                <div class="raw-data">
+                    <h3>📄 Raw Research Data</h3>
+                    <div class="raw-data-item"><div class="raw-data-label">TAM %:</div><div>${raw['TAM %'] || 'N/A'}</div></div>
+                    <div class="raw-data-item"><div class="raw-data-label">Carrier Revenue:</div><div>${raw['Carrier Revenue'] || 'N/A'}</div></div>
+                    <div class="raw-data-item"><div class="raw-data-label">Market Cap:</div><div>${raw['Market Cap'] || 'N/A'}</div></div>
+                    <div class="raw-data-item"><div class="raw-data-label">Customer Base:</div><div>${raw['Customer Base'] || 'N/A'}</div></div>
+                    <div class="raw-data-item"><div class="raw-data-label">TM Forum Speakers:</div><div>${raw['TM Forum Speakers'] || 'N/A'}</div></div>
+                    <div class="raw-data-item"><div class="raw-data-label">TM Forum Sponsorship:</div><div>${raw['TM Forum Sponsorship'] || 'N/A'}</div></div>
+                    <div class="raw-data-item"><div class="raw-data-label">Catalyst Projects:</div><div>${raw['Catalyst Projects'] || 'N/A'}</div></div>
+                    <div class="raw-data-item"><div class="raw-data-label">White Papers:</div><div>${raw['White Papers'] || 'N/A'}</div></div>
+                    <div class="raw-data-item"><div class="raw-data-label">Recent News:</div><div>${raw['Recent News Articles'] || 'N/A'}</div></div>
+                </div>
+            `;
+            document.getElementById('modalBody').innerHTML = html;
+            document.getElementById('detailModal').classList.add('active');
+        }
+        
+        function closeModal() { document.getElementById('detailModal').classList.remove('active'); }
+        document.getElementById('detailModal').addEventListener('click', (e) => { if (e.target.id === 'detailModal') { closeModal(); }});
+    </script>
+</body>
+</html>

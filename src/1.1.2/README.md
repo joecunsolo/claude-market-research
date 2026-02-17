@@ -1,0 +1,204 @@
+# Network Provider Research Tool
+
+Automated research tool that analyzes network service providers using web search and AI.
+
+## Features
+
+- 📊 Researches 14+ data points per company
+- 🔍 Uses Claude AI with web search capabilities
+- 📈 Analyzes news sentiment
+- 💾 Exports results to CSV
+- 🎨 Beautiful CLI with progress indicators
+
+## Prerequisites
+
+- Node.js 18+ installed
+- Anthropic API key ([Get one here](https://console.anthropic.com/))
+
+## Installation
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Set your Anthropic API key:
+
+**Linux/Mac:**
+```bash
+export ANTHROPIC_API_KEY=your-api-key-here
+```
+
+**Windows (Command Prompt):**
+```cmd
+set ANTHROPIC_API_KEY=your-api-key-here
+```
+
+**Windows (PowerShell):**
+```powershell
+$env:ANTHROPIC_API_KEY="your-api-key-here"
+```
+
+## Usage
+
+### Initial Research
+
+1. Fill in the `network_providers_template.csv` file with your companies:
+   - Column 1: Company Name (required)
+   - Column 2: Website (optional)
+   - Column 3: Stock Ticker (optional)
+
+2. Run the research tool:
+```bash
+npm start
+```
+
+3. Wait for the research to complete (progress is shown in real-time)
+
+4. Find results in `network_provider_research_results.csv`
+
+### Update Mode - Fix Errors
+
+If some fields failed to retrieve data (showing errors like "Error retrieving data", "No data found", etc.), you can re-run just those failed fields:
+
+```bash
+npm run update
+```
+
+This will:
+- Scan the results CSV for any errors
+- Show you which companies have errors and how many fields need updating
+- Re-research only the failed fields
+- Preserve all successful data
+- Update the results CSV with the new data
+
+**Example:**
+```bash
+$ npm run update
+
+📊 Network Provider Research Tool - Update Mode
+
+⚠️  Found 2 companies with errors:
+
+  • Verizon: 3 fields to update
+  • AT&T: 1 field to update
+
+Progress: 1/2
+
+🔍 Researching: Verizon
+✓ Completed research for Verizon (updated 3 fields)
+```
+
+### Summarize - Extract Clean Numbers
+
+After research is complete, generate a clean summary with extracted numerical values:
+
+```bash
+npm run summarize
+```
+
+This will:
+- Read the research results CSV
+- Use AI to extract clean numerical values from text descriptions
+- Create a summary CSV with standardized columns:
+  - **Carrier Revenue ($B)** - Revenue in billions USD
+  - **Market Cap ($B)** - Market capitalization in billions USD
+  - **TAM (%)** - Total addressable market percentage
+  - **Customers - Mobile (M)** - Mobile/wireless subscribers in millions
+  - **Customers - Broadband (M)** - Fixed-line/broadband subscribers in millions
+  - **Customers - Enterprise (M)** - Enterprise/wholesale customers in millions
+  - **Stock Change YoY (%)** - Year-over-year stock change with +/- sign
+  - **TM Forum Speakers** - Number of speakers/presentations at TM Forum events
+  - **Carrier Type** - Mobile/Fixed/Hybrid
+  - **Regional Market** - Geographic presence
+  - **TM Forum Membership** - Membership tier
+
+The summary file (`network_provider_summary.csv`) is perfect for:
+- Quick comparisons between companies
+- Importing into spreadsheets for analysis
+- Creating charts and visualizations
+- Executive summaries and reports
+
+**Example output:**
+```
+Company Name,Carrier Revenue ($B),Market Cap ($B),Customers - Mobile (M),Customers - Broadband (M)
+Verizon,134.0,168.5,143.0,25.3
+AT&T,120.7,142.3,127.5,15.8
+```
+
+## Data Points Collected
+
+For each company, the tool researches:
+
+- **TAM %** - Total Addressable Market share
+- **Carrier Revenue** - Annual revenue
+- **Market Cap** - Market capitalization
+- **TM Forum Speakers** - Number of speakers at TM Forum events
+- **TM Forum Sponsorship** - Sponsorship level/tier
+- **Catalyst Projects** - TM Forum Catalyst project participation
+- **White Papers** - Published telecommunications white papers
+- **Membership Tier** - TM Forum membership level
+- **Recent News Articles** - Recent news with titles, sources, sentiment, and links
+- **OSS Spend Ranking** - Operational Support Systems spending
+- **Customer Base** - Total subscribers/users
+- **Stock Change YoY** - Year-over-year stock price change
+- **Carrier Type** - Mobile, fixed-line, or hybrid
+- **Regional Market** - Geographic presence
+
+## Example Output
+
+The tool will display progress like this:
+
+```
+📊 Network Provider Research Tool
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✓ Loaded 5 companies from CSV
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Progress: 1/5
+
+🔍 Researching: Verizon
+✓ Completed research for Verizon
+
+Progress: 2/5
+...
+```
+
+## Notes
+
+- Research takes approximately 30-60 seconds per company
+- The tool includes rate limiting to respect API limits
+- All data is gathered from real-time web searches
+- Results accuracy depends on publicly available information
+
+## Troubleshooting
+
+**Error: ANTHROPIC_API_KEY environment variable not set**
+- Make sure you've set the API key environment variable
+
+**Error: Input file not found**
+- Ensure `network_providers_template.csv` exists in the project directory
+
+**Error: Results file not found (in update mode)**
+- Run the tool in normal mode first: `npm start`
+- Update mode requires an existing results file to check for errors
+
+**Rate limiting errors**
+- The tool includes automatic delays between requests
+- If issues persist, increase the delay in the code
+
+**Fields still showing errors after update**
+- Some data may genuinely not be available publicly
+- Try running update mode again - sometimes web search results vary
+- Consider manual research for critical missing data
+
+## Cost Estimation
+
+- Each company requires ~15 API calls
+- Using Claude Sonnet: approximately $0.15-0.30 per company
+- 10 companies ≈ $1.50-3.00
+
+## License
+
+MIT

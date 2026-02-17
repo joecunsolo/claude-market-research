@@ -1,0 +1,23 @@
+{
+  "name": "network-provider-research",
+  "version": "1.0.0",
+  "description": "Automated research tool for network service providers",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "update": "node index.js --update",
+    "summarize": "node summarize.js",
+    "report": "node report.js"
+  },
+  "keywords": ["research", "network", "providers", "telecommunications"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "csv-parser": "^3.0.0",
+    "csv-writer": "^1.6.0",
+    "chalk": "^5.3.0",
+    "ora": "^8.0.1"
+  }
+}
