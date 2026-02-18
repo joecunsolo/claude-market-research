@@ -46,20 +46,30 @@ export async function checkConnection() {
 /**
  * Stage 1: Chat with web search context.
  * Searches the web first, then feeds the results as context to the LLM.
+ * If search is enabled but fails, throws an error so the field can be retried later.
  *
  * @param {string} prompt - The user-facing question/instruction
  * @param {string} searchQuery - The query to search the web for
  * @param {number} numPredict - Max tokens to generate (default 500)
  * @returns {Promise<string>} The model's text response
+ * @throws {Error} If web search is enabled but fails to retrieve results
  */
 export async function chatWithSearch(prompt, searchQuery, numPredict = 500) {
   let fullPrompt = prompt;
 
   if (isSearchEnabled()) {
-    const searchContext = await searchWeb(searchQuery);
+    const { success, results: searchContext } = await searchWeb(searchQuery);
+
+    if (!success) {
+      // Search was enabled but failed — don't let the LLM hallucinate
+      throw new Error('Web search failed — cannot provide up-to-date data');
+    }
 
     if (searchContext) {
-      fullPrompt = `Based on the following web search results:\n\n${searchContext}\n\n---\n\n${prompt}`;
+      fullPrompt = `Based on the following web search results:\n\n${searchContext}\n\n---\n\n${prompt}\n\nIMPORTANT: Only use information from the search results above. Do not make up or invent any data.`;
+    } else {
+      // Search succeeded but returned no results for this query
+      fullPrompt = `${prompt}\n\nNote: No web search results were found for this query. If you do not have reliable information, respond with "No data found". Do not fabricate or guess data.`;
     }
   }
 

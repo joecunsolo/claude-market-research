@@ -23,7 +23,6 @@
     "chalk": "^5.3.0",
     "csv-parser": "^3.0.0",
     "csv-writer": "^1.6.0",
-    "duck-duck-scrape": "^2.2.7",
     "ollama": "^0.5.14",
     "ora": "^8.0.1"
   }

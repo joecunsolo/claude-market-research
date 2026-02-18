@@ -12,7 +12,9 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:duck-duck-scrape.js.org)",
       "Bash(npm install:*)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }
